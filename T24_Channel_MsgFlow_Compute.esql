@@ -1,0 +1,75 @@
+PATH DBloggingSharedLib;
+DECLARE soapenv NAMESPACE 'http://schemas.xmlsoap.org/soap/envelope/';
+DECLARE cms NAMESPACE 'http://temenos.com/CMS-SERVICES';
+DECLARE acl NAMESPACE 'http://temenos.com/ACLOCKEDEVENTS';
+DECLARE msgid CHARACTER ;
+DECLARE chmsg,ctime,number,output CHARACTER;
+
+CREATE COMPUTE MODULE T24_Channel_MsgFlow_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		Set Environment.msgid=SUBSTRING(InputLocalEnvironment.File.Name BEFORE '.');
+		if not (LENGTH(Environment.msgid)=16) then
+              Throw user EXCEPTION message 404 VALUES('Invalid messageId');
+              
+		   ELSE
+			
+		      CALL CopyEntireMessage();
+		  
+        END if;
+		
+		RETURN TRUE;
+END;
+
+	
+
+	    CREATE PROCEDURE CopyEntireMessage() BEGIN
+	    	
+	    DECLARE inref1 REFERENCE to InputRoot.XMLNSC;
+	    SET chmsg=CAST(BITSTREAM(inref1) as CHARACTER CCSID InputRoot.Properties.CodedCharSetId ENCODING InputRoot.Properties.Encoding);
+		SET ctime=cast(CURRENT_TIMESTAMP as CHARACTER CCSID  InputRoot.Properties.CodedCharSetId ENCODING InputRoot.Properties.Encoding);
+		CALL insertAuditLog(Environment.msgid,CURRENT_TIMESTAMP,chmsg,'channelReq',ApplicationLabel);
+	    CALL channelRequestPaymentAcknowledgment(Environment.msgid,'channelReq',chmsg,'-',ctime);
+	    log event values(Environment.msgid,ctime,chmsg,'channelReq',ApplicationLabel);
+	  
+		
+
+	  
+	 
+		
+        
+		
+		DECLARE inref REFERENCE to InputRoot.XMLNSC.soapenv:Envelope.soapenv:Body.cms:SBLockAmount;
+		CREATE FIELD OutputRoot.JSON.Data;
+		DECLARE outref REFERENCE TO  OutputRoot.JSON.Data;
+		set outref.password=callUdp('{User_Defined_Policy}:User_Defined_Policy','password');
+        set outref.company=callUdp('{User_Defined_Policy}:User_Defined_Policy','company');
+        set outref.userName=callUdp('{User_Defined_Policy}:User_Defined_Policy','userName');
+		set outref.ACCOUNTNUMBER=inref.ACLOCKEDEVENTSType.acl:ACCOUNTNUMBER;
+		set outref.DESCRIPTION=inref.ACLOCKEDEVENTSType.acl:DESCRIPTION;
+		set outref.FROMDATE=inref.ACLOCKEDEVENTSType.acl:FROMDATE;
+		set outref.TODATE=inref.ACLOCKEDEVENTSType.acl:TODATE;
+		set outref.LOCKEDAMOUNT=inref.ACLOCKEDEVENTSType.acl:LOCKEDAMOUNT;
+		set output=cast(BITSTREAM(outref)as CHARACTER CCSID InputRoot.Properties.CodedCharSetId  ENCODING InputRoot.Properties.Encoding);
+		
+	    call insertAuditLog(Environment.msgid,CURRENT_TIMESTAMP,output,'hostReq',ApplicationLabel);
+	    log event values(Environment.msgid,ctime,output,'hostReq',ApplicationLabel);
+
+       
+ 
+	
+		
+	END;
+END MODULE;
+
+CREATE FUNCTION callUdp(in policy CHARACTER,in propertyname CHARACTER ) returns character
+LANGUAGE JAVA
+EXTERNAL NAME "com.eidiko.udp.Udp.demo";
+
+CREATE PROCEDURE channelRequestPaymentAcknowledgment(in messageid CHARACTER,in messagetype CHARACTER,in request CHARACTER,in response CHARACTER,in currenttime CHARACTER )
+LANGUAGE DATABASE
+EXTERNAL NAME paymentacknowledgement ;
+
+
+

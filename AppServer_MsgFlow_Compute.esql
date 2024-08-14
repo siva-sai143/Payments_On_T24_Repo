@@ -1,0 +1,28 @@
+
+CREATE COMPUTE MODULE AppServer_MsgFlow_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		CALL CopyEntireMessage();
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		
+		Create Field OutputRoot.JSON.Data;
+		Declare Outref REFERENCE TO  OutputRoot.JSON.Data;
+		
+		DECLARE inref REFERENCE TO InputRoot.JSON.Data;
+		SET Outref.statusCode = 200;
+		SET Outref.message = 'Operation performed successfully';
+		SET Outref.data.accountNumber =  inref.ACCOUNTNUMBER;
+		SET Outref.data.description =  inref.DESCRIPTION;
+		SET Outref.data.fromDate = inref.FROMDATE ;
+		SET Outref.data.toDate =  inref.TODATE;
+		SET Outref.data.amount = inref.LOCKEDAMOUNT ;
+		SET Outref.data.recordStatus ='INAU';
+		SET Outref.data.inputter =  '65913_ENQUIRYUSER1__WS___OFS_TWS';
+		SET Outref.data.branchCode ='MZ0010108';
+		SET Outref.data.departamentCode = '1900' ;
+		
+	END;
+END MODULE;

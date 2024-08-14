@@ -1,0 +1,38 @@
+
+PATH DBloggingSharedLib;
+--DECLARE i INTEGER;
+DECLARE res,messageid,curtime CHARACTER;
+
+CREATE COMPUTE MODULE T24_Channel_MsgFlow_Compute1
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		 CALL CopyEntireMessage();
+		RETURN TRUE;
+	END;
+
+	
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		set OutputRoot=InputRoot;
+		DECLARE REF REFERENCE TO InputRoot.JSON.Data;
+		--set i=InputRoot.HTTPRequestHeader.messageId;
+		set res=CAST(BITSTREAM(REF)AS CHARACTER CCSID 1208 ENCODING 546);
+		--set messageid=i;
+		set curtime=CURRENT_TIMESTAMP;
+		
+		
+		
+		call insertAuditLog(Environment.msgid,CURRENT_TIMESTAMP,res,'hostRes',ApplicationLabel);
+		CALL ResponsePaymentAcknowledgment(Environment.msgid,'hostRes','-',res,curtime);
+		log EVENT VALUES(Environment.msgid,CURRENT_TIMESTAMP,res,'hostRes',ApplicationLabel);
+		
+		
+	END;
+END MODULE;
+
+CREATE PROCEDURE ResponsePaymentAcknowledgment(in messageid CHARACTER,in messagetype CHARACTER,in request CHARACTER,in response CHARACTER,in currenttime CHARACTER )
+LANGUAGE DATABASE
+EXTERNAL NAME paymentacknowledgement ;
+
+
